@@ -24,12 +24,13 @@ class ProjectAdminController extends Controller
             ->withCount(['admins', 'errorGroups as open_issues_count' => function ($q) {
                 $q->where('status', 'unresolved');
             }])
-            ->get(['id', 'name', 'slug', 'description', 'sampling_rate', 'retention_days', 'created_at'])
+            ->get(['id', 'name', 'slug', 'description', 'api_key', 'sampling_rate', 'retention_days', 'created_at'])
             ->map(fn (Project $project) => [
                 'id' => $project->id,
                 'name' => $project->name,
                 'slug' => $project->slug,
                 'description' => $project->description,
+                'api_key' => $project->api_key,
                 'sampling_rate' => $project->sampling_rate,
                 'retention_days' => $project->retention_days,
                 'admins_count' => $project->admins_count,

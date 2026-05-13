@@ -1,5 +1,5 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { AlertTriangle, Pencil, Plus, Trash2, Users } from 'lucide-react';
+import { AlertTriangle, Check, Copy, Pencil, Plus, Trash2, Users } from 'lucide-react';
 import { useState } from 'react';
 
 import ProjectAdminController from '@/actions/App/Http/Controllers/Settings/ProjectAdminController';
@@ -13,6 +13,7 @@ type Project = {
     name: string;
     slug: string;
     description: string | null;
+    api_key: string;
     sampling_rate: number;
     retention_days: number;
     admins_count: number;
@@ -57,6 +58,7 @@ export default function ProjectsIndex({ projects }: Props) {
                         <thead className="bg-muted/50 text-xs uppercase tracking-wide text-muted-foreground">
                             <tr>
                                 <th className="px-4 py-2.5 text-left font-medium">Project</th>
+                                <th className="px-4 py-2.5 text-left font-medium">API key</th>
                                 <th className="px-4 py-2.5 text-left font-medium">Sampling</th>
                                 <th className="px-4 py-2.5 text-left font-medium">Retention</th>
                                 <th className="px-4 py-2.5 text-left font-medium">Admins</th>
@@ -67,7 +69,7 @@ export default function ProjectsIndex({ projects }: Props) {
                         <tbody className="divide-y divide-border">
                             {projects.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">
                                         No projects yet.
                                     </td>
                                 </tr>
@@ -77,6 +79,9 @@ export default function ProjectsIndex({ projects }: Props) {
                                         <td className="px-4 py-3">
                                             <div className="font-medium">{project.name}</div>
                                             <div className="text-xs text-muted-foreground">{project.slug}</div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <CopyKey value={project.api_key} />
                                         </td>
                                         <td className="px-4 py-3 text-muted-foreground">
                                             {Math.round(project.sampling_rate * 100)}%
@@ -122,6 +127,45 @@ export default function ProjectsIndex({ projects }: Props) {
 
             {target && <DeleteDialog project={target} onClose={() => setTarget(null)} />}
         </SettingsShell>
+    );
+}
+
+function CopyKey({ value }: { value: string }) {
+    const [copied, setCopied] = useState(false);
+
+    const copy = async () => {
+        try {
+            await navigator.clipboard.writeText(value);
+        } catch {
+            const ta = document.createElement('textarea');
+            ta.value = value;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+        }
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+    };
+
+    const masked = value.length > 12 ? `${value.slice(0, 8)}…${value.slice(-4)}` : value;
+
+    return (
+        <button
+            type="button"
+            onClick={copy}
+            title={copied ? 'Copied!' : `Copy ${value}`}
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+            <span>{masked}</span>
+            {copied ? (
+                <Check className="h-3 w-3 text-emerald-600" />
+            ) : (
+                <Copy className="h-3 w-3" />
+            )}
+        </button>
     );
 }
 
