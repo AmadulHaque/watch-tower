@@ -12,11 +12,17 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function home(): RedirectResponse
+    public function home(Request $request): RedirectResponse
     {
-        $project = Project::query()->orderBy('created_at')->first();
+        $user = $request->user();
 
-        abort_unless($project, 404, 'No projects exist yet. Run `php artisan db:seed` to create demo data.');
+        $project = $user->isSuperAdmin()
+            ? Project::query()->orderBy('created_at')->first()
+            : $user->projects()->orderBy('created_at')->first();
+
+        if (! $project) {
+            return redirect()->route('settings.profile.show');
+        }
 
         return redirect()->route('projects.dashboard', $project);
     }

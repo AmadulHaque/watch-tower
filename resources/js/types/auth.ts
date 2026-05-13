@@ -1,14 +1,15 @@
+export type UserRole = 'super_admin' | 'admin';
+
 export type User = {
     id: number;
     name: string;
     email: string;
-    avatar?: string;
-    email_verified_at: string | null;
-    created_at: string;
-    updated_at: string;
-    [key: string]: unknown; // This allows for additional properties...
+    role: UserRole;
+    avatar_url: string | null;
+    is_super_admin: boolean;
+    [key: string]: unknown;
 };
 
 export type Auth = {
-    user: User;
+    user: User | null;
 };

@@ -8,41 +8,36 @@ use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
 {
-    /**
-     * The root template that's loaded on the first page visit.
-     *
-     * @see https://inertiajs.com/server-side-setup#root-template
-     *
-     * @var string
-     */
     protected $rootView = 'app';
 
-    /**
-     * Determines the current asset version.
-     *
-     * @see https://inertiajs.com/asset-versioning
-     */
     public function version(Request $request): ?string
     {
         return parent::version($request);
     }
 
-    /**
-     * Define the props that are shared by default.
-     *
-     * @see https://inertiajs.com/shared-data
-     *
-     * @return array<string, mixed>
-     */
     public function share(Request $request): array
     {
         $currentProject = $request->route('project');
+        $user = $request->user();
 
         return [
             ...parent::share($request),
             'name' => config('app.name'),
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user ? [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                    'avatar_url' => $user->avatar_path
+                        ? asset('storage/'.$user->avatar_path)
+                        : null,
+                    'is_super_admin' => $user->isSuperAdmin(),
+                ] : null,
+            ],
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
             ],
             'currentProject' => $currentProject instanceof Project ? [
                 'id' => $currentProject->id,
@@ -51,15 +46,25 @@ class HandleInertiaRequests extends Middleware
                 'environment' => $currentProject->organization?->plan ?? 'production',
                 'open_issues_count' => $currentProject->errorGroups()->where('status', 'unresolved')->count(),
             ] : null,
-            'projects' => fn () => Project::query()
-                ->orderBy('name')
-                ->get(['id', 'slug', 'name'])
-                ->map(fn (Project $project) => [
-                    'id' => $project->id,
-                    'slug' => $project->slug,
-                    'name' => $project->name,
-                ])
-                ->all(),
+            'projects' => function () use ($user) {
+                if (! $user) {
+                    return [];
+                }
+
+                $query = $user->isSuperAdmin()
+                    ? Project::query()
+                    : $user->projects()->getQuery();
+
+                return $query
+                    ->orderBy('name')
+                    ->get(['projects.id', 'projects.slug', 'projects.name'])
+                    ->map(fn (Project $project) => [
+                        'id' => $project->id,
+                        'slug' => $project->slug,
+                        'name' => $project->name,
+                    ])
+                    ->all();
+            },
         ];
     }
 }

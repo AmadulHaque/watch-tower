@@ -14,6 +14,7 @@ import {
     Network,
     PanelLeftClose,
     PanelLeftOpen,
+    Settings,
     Sun,
     Terminal,
     Users,
@@ -41,6 +42,7 @@ import queries from '@/routes/projects/queries';
 import requests from '@/routes/projects/requests';
 import scheduledTasks from '@/routes/projects/scheduled-tasks';
 import users from '@/routes/projects/users';
+import profile from '@/routes/settings/profile';
 import type { User } from '@/types/auth';
 import type { CurrentProject, ProjectSummary } from '@/types/inertia';
 
@@ -235,6 +237,11 @@ function UserFooter({ user, collapsed }: { user: User | null; collapsed: boolean
     if (collapsed) {
         return (
             <div className="flex flex-col items-center gap-1 px-2 py-3">
+                <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="Settings">
+                    <Link href={profile.show().url} aria-label="Settings">
+                        <Settings className="h-4 w-4" />
+                    </Link>
+                </Button>
                 <Button
                     type="button"
                     onClick={toggle}
@@ -246,25 +253,35 @@ function UserFooter({ user, collapsed }: { user: User | null; collapsed: boolean
                 >
                     {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </Button>
-                <span
+                <Link
+                    href={profile.show().url}
                     className="grid h-7 w-7 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground"
                     title={user?.name ?? 'Guest'}
                 >
                     {(user?.name ?? 'G').charAt(0).toUpperCase()}
-                </span>
+                </Link>
             </div>
         );
     }
 
     return (
         <div className="flex items-center gap-2 px-3 py-3 text-xs">
-            <span className="grid h-7 w-7 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground">
+            <Link
+                href={profile.show().url}
+                className="grid h-7 w-7 place-items-center rounded-full bg-primary text-[11px] font-semibold text-primary-foreground transition-opacity hover:opacity-80"
+                title="Settings"
+            >
                 {(user?.name ?? 'G').charAt(0).toUpperCase()}
-            </span>
+            </Link>
             <div className="min-w-0 flex-1 leading-tight">
                 <div className="truncate font-medium text-foreground">{user?.name ?? 'Guest'}</div>
                 <div className="truncate text-muted-foreground">{user?.email ?? 'Not signed in'}</div>
             </div>
+            <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="Settings">
+                <Link href={profile.show().url} aria-label="Settings">
+                    <Settings className="h-4 w-4" />
+                </Link>
+            </Button>
             <Button
                 type="button"
                 onClick={toggle}

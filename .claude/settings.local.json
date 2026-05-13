@@ -81,7 +81,16 @@
       "Bash(curl -s \"http://127.0.0.1:8889/projects/acme-app/users?range=24h&search=felix\" -w \"Search HTTP %{http_code}\\\\n\" -o /dev/null)",
       "Bash(curl -s \"http://127.0.0.1:8889/projects/acme-app/users?range=7d\" -w \"Range7d HTTP %{http_code}\\\\n\" -o /dev/null)",
       "Bash(curl -s \"http://127.0.0.1:8889/projects/acme-app/users/usr_does_not_exist\" -w \"404 HTTP %{http_code}\\\\n\" -o /dev/null)",
-      "Bash(find resources/js/pages/projects/placeholder*)"
+      "Bash(find resources/js/pages/projects/placeholder*)",
+      "Bash(curl -sI http://localhost:8000/login)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://127.0.0.1:8765/login)",
+      "Bash(curl -s -b /tmp/lw-cookies.txt -o /tmp/profile.html -w 'Status: %{http_code}\\\\n' http://127.0.0.1:8765/settings/profile)",
+      "Bash(curl -s -b /tmp/lw-cookies.txt -o /tmp/admins.html -w 'Status: %{http_code}\\\\n' http://127.0.0.1:8765/settings/admins)",
+      "Bash(curl -s -b /tmp/lw-cookies.txt -o /tmp/admins-create.html -w 'Status: %{http_code}\\\\n' http://127.0.0.1:8765/settings/admins/create)",
+      "Bash(curl -s -b /tmp/lw-cookies.txt -o /tmp/projects.html -w 'Status: %{http_code}\\\\n' http://127.0.0.1:8765/settings/projects)",
+      "Bash(curl -s -b /tmp/lw-cookies.txt -o /tmp/projects-create.html -w 'Status: %{http_code}\\\\n' http://127.0.0.1:8765/settings/projects/create)",
+      "Bash(curl -s -b /tmp/admin-cookies.txt -o /dev/null -w 'Status: %{http_code}\\\\n' http://127.0.0.1:8765/projects/acme-app/dashboard)",
+      "Bash(pkill -f \"php artisan serve --port=8765\")"
     ],
     "additionalDirectories": [
       "/tmp"
