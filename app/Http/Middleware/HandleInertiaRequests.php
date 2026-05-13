@@ -49,6 +49,7 @@ class HandleInertiaRequests extends Middleware
                 'slug' => $currentProject->slug,
                 'name' => $currentProject->name,
                 'environment' => $currentProject->organization?->plan ?? 'production',
+                'open_issues_count' => $currentProject->errorGroups()->where('status', 'unresolved')->count(),
             ] : null,
             'projects' => fn () => Project::query()
                 ->orderBy('name')

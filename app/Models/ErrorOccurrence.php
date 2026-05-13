@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'user_email',
     'file',
     'line',
+    'is_handled',
     'environment',
     'release_version',
     'context',
@@ -37,6 +38,7 @@ class ErrorOccurrence extends Model
             'stacktrace' => 'array',
             'context' => 'array',
             'line' => 'integer',
+            'is_handled' => 'boolean',
             'occurred_at' => 'datetime',
         ];
     }

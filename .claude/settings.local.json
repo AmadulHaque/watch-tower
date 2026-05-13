@@ -15,7 +15,21 @@
       "Read(//private/tmp/**)",
       "Bash(curl -s http://127.0.0.1:8765/projects/acme-app/requests -o /tmp/req.html -w \"%{http_code}\\\\n\")",
       "Bash(curl -s http://127.0.0.1:8765/projects/acme-app/exceptions -o /tmp/exc.html -w \"%{http_code}\\\\n\")",
-      "Bash(curl -s http://127.0.0.1:8765/projects/acme-app/jobs -o /tmp/jobs.html -w \"%{http_code}\\\\n\")"
+      "Bash(curl -s http://127.0.0.1:8765/projects/acme-app/jobs -o /tmp/jobs.html -w \"%{http_code}\\\\n\")",
+      "Bash(npx tsc *)",
+      "Bash(curl -sS -o /dev/null -w '%{http_code}\\\\n' http://127.0.0.1:8765/)",
+      "Bash(curl -sS -o /dev/null -w '%{http_code}\\\\n' http://127.0.0.1:8765/projects/acme-app/dashboard)",
+      "Bash(curl -sS -o /dev/null -w '%{http_code}\\\\n' http://127.0.0.1:8765/projects/acme-app/requests)",
+      "Bash(curl -sS -o /dev/null -w '%{http_code}\\\\n' http://127.0.0.1:8765/projects/acme-app/exceptions)",
+      "Bash(curl -sf -o /dev/null -w '%{http_code}\\\\n' http://127.0.0.1:8000/)",
+      "Bash(curl -s -o /tmp/iss_index.html -w 'HTTP %{http_code} | size: %{size_download}\\\\n' 'http://127.0.0.1:8000/projects/acme-app/issues')",
+      "Bash(curl -s -o /tmp/iss_open.html -w 'HTTP %{http_code} | size: %{size_download}\\\\n' 'http://127.0.0.1:8000/projects/acme-app/issues?status=open&assignee=unassigned')",
+      "Bash(curl -s -o /tmp/iss_show.html -w 'HTTP %{http_code} | size: %{size_download}\\\\n' 'http://127.0.0.1:8000/projects/acme-app/issues/1')",
+      "Bash(curl -s -c /tmp/cookies.txt 'http://127.0.0.1:8000/projects/acme-app/issues/1')",
+      "Bash(awk '{print $2}')"
+    ],
+    "additionalDirectories": [
+      "/tmp"
     ]
   }
 }

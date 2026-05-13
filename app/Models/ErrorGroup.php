@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'project_id',
     'fingerprint',
+    'display_number',
     'exception_class',
     'first_message',
     'first_file',
@@ -21,6 +22,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'first_occurrence_at',
     'last_occurrence_at',
     'status',
+    'priority',
+    'description',
+    'is_handled',
+    'linear_issue_url',
+    'subscriber_ids',
+    'framework_version',
+    'language_version',
     'resolved_at',
     'resolved_by_user_id',
     'assigned_to_user_id',
@@ -40,6 +48,9 @@ class ErrorGroup extends Model
             'resolved_at' => 'datetime',
             'total_count' => 'integer',
             'first_line' => 'integer',
+            'display_number' => 'integer',
+            'is_handled' => 'boolean',
+            'subscriber_ids' => 'array',
             'tags' => 'array',
         ];
     }

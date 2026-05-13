@@ -8,6 +8,7 @@ export type ProjectSummary = {
 
 export type CurrentProject = ProjectSummary & {
     environment: string;
+    open_issues_count: number;
 };
 
 export type SharedProps = {

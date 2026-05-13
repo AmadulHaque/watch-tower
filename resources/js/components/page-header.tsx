@@ -1,7 +1,9 @@
 import { Link, router } from '@inertiajs/react';
+import { ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type Crumb = {
     label: string;
@@ -20,19 +22,19 @@ const RANGES = ['15m', '1h', '24h', '7d', '14d', '30d'] as const;
 
 export function PageHeader({ title, breadcrumbs, selectedRange, onRangeChange, actions }: PageHeaderProps) {
     return (
-        <header className="border-b border-[#e6e7eb] bg-white px-6 py-4 dark:border-[#1d2129] dark:bg-[#0f1217]">
+        <header className="border-b border-border bg-background px-6 py-4">
             {breadcrumbs ? (
-                <nav className="mb-1 flex items-center gap-1 text-xs text-[#9aa0aa]">
+                <nav className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
                     {breadcrumbs.map((crumb, i) => (
                         <span key={i} className="flex items-center gap-1">
                             {crumb.href ? (
-                                <Link href={crumb.href} className="hover:text-[#1f2330] dark:hover:text-white">
+                                <Link href={crumb.href} className="hover:text-foreground">
                                     {crumb.label}
                                 </Link>
                             ) : (
                                 <span>{crumb.label}</span>
                             )}
-                            {i < breadcrumbs.length - 1 ? <span>/</span> : null}
+                            {i < breadcrumbs.length - 1 ? <ChevronRight className="h-3 w-3" /> : null}
                         </span>
                     ))}
                 </nav>
@@ -43,7 +45,12 @@ export function PageHeader({ title, breadcrumbs, selectedRange, onRangeChange, a
 
                 <div className="flex items-center gap-3">
                     {selectedRange ? <RangeTabs value={selectedRange} onChange={onRangeChange} /> : null}
-                    {actions}
+                    {actions ? (
+                        <>
+                            {selectedRange ? <Separator orientation="vertical" className="h-6" /> : null}
+                            {actions}
+                        </>
+                    ) : null}
                 </div>
             </div>
         </header>
@@ -52,33 +59,25 @@ export function PageHeader({ title, breadcrumbs, selectedRange, onRangeChange, a
 
 function RangeTabs({ value, onChange }: { value: string; onChange?: (range: string) => void }) {
     return (
-        <div className="inline-flex items-center rounded-md border border-[#e6e7eb] bg-white p-0.5 text-xs shadow-sm dark:border-[#1d2129] dark:bg-[#0f1217]">
-            {RANGES.map((range) => {
-                const active = range === value;
-                return (
-                    <button
-                        key={range}
-                        type="button"
-                        onClick={() => {
-                            if (onChange) {
-                                onChange(range);
-                                return;
-                            }
-                            const url = new URL(window.location.href);
-                            url.searchParams.set('range', range);
-                            router.visit(url.pathname + url.search, { preserveScroll: true });
-                        }}
-                        className={cn(
-                            'rounded px-2 py-1 transition-colors',
-                            active
-                                ? 'bg-[#1f2330] text-white shadow dark:bg-emerald-500'
-                                : 'text-[#5e6470] hover:text-[#1f2330] dark:text-[#a0a6b1] dark:hover:text-white',
-                        )}
-                    >
+        <Tabs
+            value={value}
+            onValueChange={(range) => {
+                if (onChange) {
+                    onChange(range);
+                    return;
+                }
+                const url = new URL(window.location.href);
+                url.searchParams.set('range', range);
+                router.visit(url.pathname + url.search, { preserveScroll: true });
+            }}
+        >
+            <TabsList className="h-8">
+                {RANGES.map((range) => (
+                    <TabsTrigger key={range} value={range} className="px-2.5">
                         {range}
-                    </button>
-                );
-            })}
-        </div>
+                    </TabsTrigger>
+                ))}
+            </TabsList>
+        </Tabs>
     );
 }

@@ -15,7 +15,7 @@ export function AppLayout({ title, children }: AppLayoutProps) {
     return (
         <>
             <Head title={title} />
-            <div className="min-h-screen bg-[#f5f6f8] text-[#1f2330] dark:bg-[#0e1014] dark:text-[#e6e7ea]">
+            <div className="min-h-screen bg-background text-foreground">
                 {props.currentProject ? (
                     <ProjectShell
                         project={props.currentProject}
