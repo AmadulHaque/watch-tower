@@ -240,20 +240,48 @@ function StacktraceCard({ issue }: { issue: Issue }) {
     const groups = groupFrames(frames);
     const [copied, setCopied] = useState(false);
 
-    const copyMarkdown = () => {
+    
+    const copyMarkdown = async () => {
         const md = [
             `**${issue.short_class}**`,
             '',
             issue.first_message,
             '',
             '```',
-            ...frames.slice(0, 10).map((f) => `${f.file} — ${f.source}`),
+            ...frames.slice(0, 10).map((f) => `${f.file} — ${f.source} : ${f.code ? Object.values(f.code).join('\n') : 'No code snippet available'}`),
             '```',
         ].join('\n');
-        void navigator.clipboard.writeText(md).then(() => {
+
+        if (navigator.clipboard && window.isSecureContext) {
+            try {
+                await navigator.clipboard.writeText(md);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+            } catch (err) {
+                fallbackCopy(md);
+            }
+        } else {
+            fallbackCopy(md);
+        }
+    };
+
+    const fallbackCopy = (text) => {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed'; // avoid scroll jump
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+
+        try {
+            document.execCommand('copy');
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
-        });
+        } catch (err) {
+            console.error('Copy failed', err);
+        }
+
+        document.body.removeChild(textarea);
     };
 
     return (

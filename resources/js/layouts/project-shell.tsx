@@ -221,12 +221,6 @@ function ProjectSwitcher({ current, projects }: { current: CurrentProject; proje
                     ))}
                 </SelectContent>
             </Select>
-            <div className="mt-2 flex items-center justify-between text-[10px] tracking-wider text-muted-foreground uppercase">
-                <span>Environment</span>
-                <Badge variant="muted" className="font-mono normal-case">
-                    {current.environment}
-                </Badge>
-            </div>
         </div>
     );
 }
