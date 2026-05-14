@@ -92,13 +92,87 @@ it('skips unknown record types', function () {
     $project = Project::factory()->create();
 
     postNightwatchRecords([
-        ['v' => 1, 't' => 'cache-event', 'trace_id' => 'x'],
-        ['v' => 1, 't' => 'log', 'trace_id' => 'y'],
+        ['v' => 1, 't' => 'something-new', 'trace_id' => 'x'],
     ], ingestToken($project->id))
         ->assertOk()
-        ->assertJson(['records_received' => 2, 'records_queued' => 0]);
+        ->assertJson(['records_received' => 1, 'records_queued' => 0]);
 
     Queue::assertNotPushed(ProcessWatchEvent::class);
+});
+
+it('queues a translated cache-event record', function () {
+    Queue::fake();
+    $project = Project::factory()->create();
+
+    $record = [
+        'v' => 1,
+        't' => 'cache-event',
+        'timestamp' => 1778755417.835628,
+        'deploy' => 'production',
+        'server' => 'web-1',
+        '_group' => 'group-hash',
+        'trace_id' => 'trace-cache-1',
+        'execution_source' => 'request',
+        'execution_preview' => 'GET /home',
+        'store' => 'database',
+        'key' => 'test',
+        'type' => 'write',
+        'duration' => 3223,
+        'ttl' => 60,
+    ];
+
+    postNightwatchRecords([$record], ingestToken($project->id))
+        ->assertOk()
+        ->assertJson(['records_received' => 1, 'records_queued' => 1]);
+
+    Queue::assertPushed(ProcessWatchEvent::class, function ($job) use ($project) {
+        return $job->projectId === $project->id
+            && $job->event['type'] === 'cache-event'
+            && $job->event['data']['key'] === 'test'
+            && $job->event['data']['store'] === 'database'
+            && $job->event['data']['operation'] === 'write'
+            && $job->event['data']['succeeded'] === true
+            && $job->event['data']['duration_ms'] === 3
+            && $job->event['data']['environment'] === 'production'
+            && $job->event['data']['request_id'] === 'trace-cache-1';
+    });
+});
+
+it('queues a translated log record', function () {
+    Queue::fake();
+    $project = Project::factory()->create();
+
+    $record = [
+        'v' => 1,
+        't' => 'log',
+        'timestamp' => 1778754766.635732,
+        'deploy' => 'production',
+        'server' => 'web-1',
+        'trace_id' => 'trace-log-1',
+        'execution_source' => 'request',
+        'execution_preview' => 'GET /home',
+        'user' => 'amal',
+        'level' => 'info',
+        'message' => 'HomeController@index called',
+        'context' => '{"foo":"bar"}',
+    ];
+
+    postNightwatchRecords([$record], ingestToken($project->id))
+        ->assertOk()
+        ->assertJson(['records_received' => 1, 'records_queued' => 1]);
+
+    Queue::assertPushed(ProcessWatchEvent::class, function ($job) use ($project) {
+        return $job->projectId === $project->id
+            && $job->event['type'] === 'log'
+            && $job->event['data']['level'] === 'info'
+            && $job->event['data']['message'] === 'HomeController@index called'
+            && $job->event['data']['source_type'] === 'request'
+            && $job->event['data']['source_label'] === 'GET /home'
+            && $job->event['data']['user_name'] === 'amal'
+            && $job->event['data']['context'] === ['foo' => 'bar']
+            && $job->event['data']['environment'] === 'production'
+            && $job->event['data']['request_id'] === 'trace-log-1';
+    });
 });
 
 it('rejects payload with malformed JSON', function () {

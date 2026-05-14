@@ -2,9 +2,11 @@
 
 namespace App\Watch;
 
+use App\Models\CacheEvent;
 use App\Models\ErrorGroup;
 use App\Models\ErrorOccurrence;
 use App\Models\EventOccurrence;
+use App\Models\LogEntry;
 use App\Models\Project;
 use App\Models\QueueJobRun;
 use App\Models\Trace;
@@ -29,6 +31,8 @@ class EventStore
             'exception' => $this->storeException($project, $event['data']),
             'event' => $this->storeEvent($project, $event['data']),
             'job' => $this->storeJob($project, $event['data']),
+            'log' => $this->storeLog($project, $event['data']),
+            'cache-event' => $this->storeCacheEvent($project, $event['data']),
             default => null,
         };
     }
@@ -209,6 +213,52 @@ class EventStore
             'payload' => $data['payload'] ?? null,
             'exception' => $data['exception'] ?? null,
             'environment' => $this->stringOrNull($data['environment'] ?? null),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function storeCacheEvent(Project $project, array $data): void
+    {
+        $trace = $this->resolveTrace($project, $data);
+
+        CacheEvent::create([
+            'project_id' => $project->id,
+            'trace_id' => $trace?->id,
+            'key' => (string) ($data['key'] ?? ''),
+            'store' => $this->stringOrNull($data['store'] ?? null),
+            'operation' => (string) ($data['operation'] ?? 'unknown'),
+            'succeeded' => (bool) ($data['succeeded'] ?? true),
+            'duration_ms' => $this->intOrNull($data['duration_ms'] ?? null),
+            'environment' => $this->stringOrNull($data['environment'] ?? null),
+            'occurred_at' => $this->parseTimestamp($data['occurred_at'] ?? null),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function storeLog(Project $project, array $data): void
+    {
+        $trace = $this->resolveTrace($project, $data);
+
+        $context = $data['context'] ?? null;
+        if ($context === [] || $context === '') {
+            $context = null;
+        }
+
+        LogEntry::create([
+            'project_id' => $project->id,
+            'trace_id' => $trace?->id,
+            'level' => (string) ($data['level'] ?? 'info'),
+            'message' => (string) ($data['message'] ?? ''),
+            'source_type' => $this->stringOrNull($data['source_type'] ?? null),
+            'source_label' => $this->stringOrNull($data['source_label'] ?? null),
+            'user_name' => $this->stringOrNull($data['user_name'] ?? null),
+            'context' => is_array($context) ? $context : null,
+            'environment' => $this->stringOrNull($data['environment'] ?? null),
+            'occurred_at' => $this->parseTimestamp($data['occurred_at'] ?? null),
         ]);
     }
 

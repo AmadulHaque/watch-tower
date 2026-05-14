@@ -26,6 +26,8 @@ class NightwatchTranslator
             'query' => $this->translateQuery($record),
             'exception' => $this->translateException($record),
             'queued-job' => $this->translateQueuedJob($record),
+            'log' => $this->translateLog($record),
+            'cache-event' => $this->translateCacheEvent($record),
             default => null,
         };
     }
@@ -123,6 +125,76 @@ class NightwatchTranslator
                 'environment' => $this->stringOrNull($r['deploy'] ?? null),
             ],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $r
+     * @return array{type: string, id: string, data: array<string, mixed>}
+     */
+    private function translateLog(array $r): array
+    {
+        return [
+            'type' => 'log',
+            'id' => (string) ($r['trace_id'] ?? ''),
+            'data' => [
+                'request_id' => $this->stringOrNull($r['trace_id'] ?? null),
+                'level' => (string) ($r['level'] ?? 'info'),
+                'message' => (string) ($r['message'] ?? ''),
+                'source_type' => $this->stringOrNull($r['execution_source'] ?? null),
+                'source_label' => $this->stringOrNull($r['execution_preview'] ?? null),
+                'user_name' => $this->stringOrNull($r['user'] ?? null),
+                'context' => $this->decodeMaybeJson($r['context'] ?? null),
+                'environment' => $this->stringOrNull($r['deploy'] ?? null),
+                'occurred_at' => $this->timestampToIso($r['timestamp'] ?? null),
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $r
+     * @return array{type: string, id: string, data: array<string, mixed>}
+     */
+    private function translateCacheEvent(array $r): array
+    {
+        return [
+            'type' => 'cache-event',
+            'id' => (string) ($r['_group'] ?? ''),
+            'data' => [
+                'request_id' => $this->stringOrNull($r['trace_id'] ?? null),
+                'key' => (string) ($r['key'] ?? ''),
+                'store' => $this->stringOrNull($r['store'] ?? null),
+                'operation' => $this->normalizeCacheOperation($r['type'] ?? null),
+                'succeeded' => $this->cacheSucceeded($r),
+                'duration_ms' => $this->microsToMillis($r['duration'] ?? null),
+                'environment' => $this->stringOrNull($r['deploy'] ?? null),
+                'occurred_at' => $this->timestampToIso($r['timestamp'] ?? null),
+            ],
+        ];
+    }
+
+    private function normalizeCacheOperation(mixed $value): string
+    {
+        $op = is_string($value) ? strtolower($value) : '';
+
+        return match ($op) {
+            'hit', 'miss', 'write', 'delete' => $op,
+            'forget' => 'delete',
+            default => $op === '' ? 'unknown' : $op,
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $r
+     */
+    private function cacheSucceeded(array $r): bool
+    {
+        if (array_key_exists('succeeded', $r)) {
+            return (bool) $r['succeeded'];
+        }
+
+        $op = is_string($r['type'] ?? null) ? strtolower($r['type']) : '';
+
+        return ! in_array($op, ['write-failed', 'forget-failed', 'failed'], true);
     }
 
     private function microsToMillis(mixed $value): ?int
