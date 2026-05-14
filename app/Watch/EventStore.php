@@ -149,7 +149,7 @@ class EventStore
                 'error_group_id' => $group->id,
                 'exception_class' => $exceptionClass,
                 'message' => $message,
-                'stacktrace' => $data['stacktrace'] ?? $data['trace'] ?? [],
+                'stacktrace' => $data['trace'] ?? $data['stacktrace'] ?? [],
                 'fingerprint' => $fingerprint,
                 'user_identifier' => $this->stringOrNull($data['user_id'] ?? null),
                 'user_email' => $this->stringOrNull($data['user_email'] ?? null),
