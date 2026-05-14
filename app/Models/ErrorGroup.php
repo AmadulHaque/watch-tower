@@ -86,4 +86,12 @@ class ErrorGroup extends Model
     {
         return $this->belongsTo(User::class, 'assigned_to_user_id');
     }
+
+    /**
+     * @return HasMany<IssueComment, $this>
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(IssueComment::class);
+    }
 }

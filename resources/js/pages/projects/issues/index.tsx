@@ -1,13 +1,12 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronUp, ExternalLink, Search } from 'lucide-react';
 import { useState } from 'react';
 
 import { PageHeader } from '@/components/page-header';
 import { Pagination } from '@/components/pagination';
-import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppLayout } from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import issues from '@/routes/projects/issues';
@@ -42,23 +41,33 @@ type Counts = {
     all: number;
 };
 
+type Filters = {
+    status: string;
+    search: string;
+    sort: string;
+    direction: 'asc' | 'desc';
+};
+
 type Props = {
     groups: Paginated<IssueRow>;
-    filters: { status: string; assignee: string | null; search: string };
+    filters: Filters;
     counts: Counts;
 };
 
 const STATUS_TABS = [
-    { value: 'open', label: 'Open' },
-    { value: 'resolved', label: 'Resolved' },
-    { value: 'ignored', label: 'Ignored' },
-    { value: 'all', label: 'All' },
-] as const;
+    { value: 'open', label: 'Open', countKey: 'open' as const },
+    { value: 'unassigned', label: 'Unassigned', countKey: 'unassigned' as const },
+    { value: 'mine', label: 'Mine', countKey: null },
+    { value: 'resolved', label: 'Resolved', countKey: null },
+    { value: 'ignored', label: 'Ignored', countKey: null },
+];
 
-const ASSIGNEE_TABS = [
-    { value: 'all', label: 'All' },
-    { value: 'unassigned', label: 'Unassigned' },
-    { value: 'mine', label: 'Mine' },
+const SORT_COLUMNS = [
+    { key: 'id', label: 'ID' },
+    { key: 'count', label: 'Count' },
+    { key: 'users', label: 'Users' },
+    { key: 'first_seen', label: 'First seen' },
+    { key: 'last_seen', label: 'Last seen' },
 ] as const;
 
 export default function IssuesIndex({ groups, filters, counts }: Props) {
@@ -66,78 +75,90 @@ export default function IssuesIndex({ groups, filters, counts }: Props) {
     const projectSlug = props.currentProject?.slug ?? '';
     const [search, setSearch] = useState(filters.search);
 
-    const applyFilter = (key: string, value: string | null) => {
+    const visit = (params: Record<string, string | null>) => {
         const url = new URL(window.location.href);
-        if (value === null || value === '' || (key === 'assignee' && value === 'all')) {
-            url.searchParams.delete(key);
-        } else {
-            url.searchParams.set(key, value);
+        Object.entries(params).forEach(([key, value]) => {
+            if (value === null || value === '') {
+                url.searchParams.delete(key);
+            } else {
+                url.searchParams.set(key, value);
+            }
+        });
+        if ('status' in params || 'search' in params) {
+            url.searchParams.delete('page');
         }
-        url.searchParams.delete('page');
         router.visit(url.pathname + url.search, { preserveScroll: true, preserveState: true });
     };
 
     const submitSearch = (event: React.FormEvent) => {
         event.preventDefault();
-        applyFilter('search', search.trim() || null);
+        visit({ search: search.trim() || null });
     };
 
-    const assigneeValue = filters.assignee ?? 'all';
+    const onSort = (key: string) => {
+        if (filters.sort === key) {
+            visit({ direction: filters.direction === 'asc' ? 'desc' : 'asc' });
+        } else {
+            visit({ sort: key, direction: 'desc' });
+        }
+    };
 
     return (
         <AppLayout title="Issues">
-            <PageHeader title="Issues" breadcrumbs={[{ label: 'Issues' }]} />
+            <PageHeader title="Issues" />
 
             <div className="flex flex-col gap-4 px-6 py-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <Tabs value={filters.status} onValueChange={(value) => applyFilter('status', value)}>
-                        <TabsList className="h-9">
-                            {STATUS_TABS.map((tab) => (
-                                <TabsTrigger key={tab.value} value={tab.value} className="gap-2 px-3">
-                                    <span>{tab.label}</span>
-                                    <CountBadge value={tabCount(tab.value, counts)} active={filters.status === tab.value} />
-                                </TabsTrigger>
-                            ))}
-                        </TabsList>
-                    </Tabs>
+                    <PillTabs
+                        active="exceptions"
+                        tabs={[
+                            { value: 'exceptions', label: 'Exceptions', count: counts.all },
+                            { value: 'performance', label: 'Performance', count: 0, disabled: true },
+                        ]}
+                    />
 
-                    <div className="flex items-center gap-2">
-                        <Tabs value={assigneeValue} onValueChange={(value) => applyFilter('assignee', value)}>
-                            <TabsList className="h-9">
-                                {ASSIGNEE_TABS.map((tab) => (
-                                    <TabsTrigger key={tab.value} value={tab.value} className="gap-2 px-3">
-                                        <span>{tab.label}</span>
-                                        {tab.value !== 'all' && (
-                                            <CountBadge
-                                                value={tab.value === 'unassigned' ? counts.unassigned : counts.mine}
-                                                active={assigneeValue === tab.value}
-                                            />
-                                        )}
-                                    </TabsTrigger>
-                                ))}
-                            </TabsList>
-                        </Tabs>
-
+                    <div className="flex items-center gap-3">
                         <form onSubmit={submitSearch} className="relative">
                             <Search className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
                                 type="search"
                                 value={search}
                                 onChange={(event) => setSearch(event.target.value)}
-                                placeholder="Search exceptions"
-                                className="h-9 w-64 pl-8"
+                                placeholder="Search"
+                                className="h-8 w-56 pl-8 text-xs"
                             />
                         </form>
+
+                        <PillTabs
+                            active={filters.status}
+                            onChange={(value) => visit({ status: value })}
+                            tabs={STATUS_TABS.map((tab) => ({
+                                value: tab.value,
+                                label: tab.label,
+                                count: tab.countKey ? counts[tab.countKey] : undefined,
+                            }))}
+                        />
                     </div>
                 </div>
 
-                <Card className="overflow-hidden">
+                <Card className="overflow-hidden p-0">
+                    <div className="grid grid-cols-[40px_60px_50px_minmax(0,1fr)_90px_90px_120px_120px_120px_40px] items-center gap-4 border-b border-border bg-card px-4 py-2.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                        <SortHeader label="ID" sortKey="id" current={filters.sort} direction={filters.direction} onSort={onSort} />
+                        <span>Issue</span>
+                        <SortHeader label="Count" sortKey="count" current={filters.sort} direction={filters.direction} onSort={onSort} align="right" />
+                        <SortHeader label="Users" sortKey="users" current={filters.sort} direction={filters.direction} onSort={onSort} align="right" />
+                        <SortHeader label="First seen" sortKey="first_seen" current={filters.sort} direction={filters.direction} onSort={onSort} align="right" />
+                        <SortHeader label="Last seen" sortKey="last_seen" current={filters.sort} direction={filters.direction} onSort={onSort} align="right" />
+                        <span>Assigned</span>
+                        <span />
+                    </div>
+
                     {groups.data.length === 0 ? (
                         <EmptyState />
                     ) : (
                         <ul className="divide-y divide-border">
                             {groups.data.map((issue) => (
-                                <IssueListItem key={issue.id} issue={issue} projectSlug={projectSlug} />
+                                <IssueRowItem key={issue.id} issue={issue} projectSlug={projectSlug} />
                             ))}
                         </ul>
                     )}
@@ -149,113 +170,159 @@ export default function IssuesIndex({ groups, filters, counts }: Props) {
     );
 }
 
-function IssueListItem({ issue, projectSlug }: { issue: IssueRow; projectSlug: string }) {
+function PillTabs({
+    active,
+    tabs,
+    onChange,
+}: {
+    active: string;
+    tabs: { value: string; label: string; count?: number; disabled?: boolean }[];
+    onChange?: (value: string) => void;
+}) {
+    return (
+        <div className="inline-flex items-center gap-1 rounded-md border border-border bg-card p-1">
+            {tabs.map((tab) => {
+                const isActive = tab.value === active;
+                const className = cn(
+                    'inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors',
+                    isActive ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground',
+                    tab.disabled && 'cursor-not-allowed opacity-50',
+                );
+
+                return (
+                    <button
+                        key={tab.value}
+                        type="button"
+                        disabled={tab.disabled || !onChange}
+                        onClick={() => !tab.disabled && onChange?.(tab.value)}
+                        className={className}
+                    >
+                        <span>{tab.label}</span>
+                        {tab.count !== undefined && (
+                            <span
+                                className={cn(
+                                    'rounded px-1 font-mono text-[10px] tabular-nums',
+                                    isActive ? 'bg-background text-foreground' : 'text-muted-foreground',
+                                )}
+                            >
+                                {formatCount(tab.count)}
+                            </span>
+                        )}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+function SortHeader({
+    label,
+    sortKey,
+    current,
+    direction,
+    onSort,
+    align = 'left',
+}: {
+    label: string;
+    sortKey: string;
+    current: string;
+    direction: 'asc' | 'desc';
+    onSort: (key: string) => void;
+    align?: 'left' | 'right';
+}) {
+    const isActive = current === sortKey;
+    const Icon = isActive ? (direction === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown;
+
+    return (
+        <button
+            type="button"
+            onClick={() => onSort(sortKey)}
+            className={cn(
+                'inline-flex items-center gap-1 transition-colors hover:text-foreground',
+                align === 'right' && 'justify-end',
+                isActive && 'text-foreground',
+            )}
+        >
+            <span>{label}</span>
+            <Icon className="h-3 w-3 opacity-70" />
+        </button>
+    );
+}
+
+function IssueRowItem({ issue, projectSlug }: { issue: IssueRow; projectSlug: string }) {
     const href = issues.show([projectSlug, issue.display_number]).url;
 
     return (
-        <li>
+        <li className="grid grid-cols-[40px_60px_50px_minmax(0,1fr)_90px_90px_120px_120px_120px_40px] items-center gap-4 px-4 py-3 transition-colors hover:bg-muted/30">
+            
+            <Link href={href} className="font-mono text-xs text-muted-foreground hover:text-foreground">
+                {issue.display_number}
+            </Link>
+
+            <Link href={href} className="min-w-0">
+                <div className="text-sm font-medium text-foreground" title={issue.short_class}>
+                    {issue.short_class}
+                </div>
+                <div className="font-mono text-[11px] text-muted-foreground" title={issue.first_message}>
+                    {issue.first_message || '—'}
+                </div>  
+            </Link>
+
+            <span className="text-right font-mono text-sm tabular-nums">{formatCount(issue.total_count)}</span>
+            <span className="text-right font-mono text-sm tabular-nums">{formatCount(issue.users_count)}</span>
+            <span className="text-right font-mono text-[11px] text-muted-foreground">
+                {formatRelative(issue.first_occurrence_at)}
+            </span>
+            <span className="text-right font-mono text-[11px] text-muted-foreground">
+                {formatRelative(issue.last_occurrence_at)}
+            </span>
+
+            <span className="flex items-center gap-1">
+                {issue.assigned_to ? (
+                    <Avatar name={issue.assigned_to.name} />
+                ) : (
+                    <Avatar name="?" muted />
+                )}
+                {issue.assigned_to.name}
+            </span>
+
             <Link
                 href={href}
-                className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-6 px-5 py-4 transition-colors hover:bg-muted/40"
+                aria-label="Open issue"
+                className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
             >
-                <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                        <span className="font-mono text-muted-foreground/80">#{issue.display_number}</span>
-                        <Badge variant="muted" className="font-mono text-[10px]">
-                            {issue.short_class}
-                        </Badge>
-                        {issue.is_handled ? (
-                            <Badge variant="muted" className="text-[10px] tracking-wide uppercase">
-                                Handled
-                            </Badge>
-                        ) : (
-                            <Badge variant="destructive" className="text-[10px] tracking-wide uppercase">
-                                Unhandled
-                            </Badge>
-                        )}
-                        {issue.priority !== 'none' && <PriorityBadge priority={issue.priority} />}
-                    </div>
-                    <p className="mt-1 truncate text-sm font-medium text-foreground">{issue.first_message}</p>
-                    <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
-                        {issue.first_file ?? 'unknown'}
-                        {issue.first_line ? `:${issue.first_line}` : ''}
-                    </p>
-                </div>
-
-                <Sparkline values={issue.sparkline} />
-
-                <Stat label="events" value={issue.total_count.toLocaleString()} />
-                <Stat label="users" value={issue.users_count.toLocaleString()} />
-
-                <div className="flex items-center gap-2 text-right">
-                    <div className="hidden flex-col items-end text-[11px] leading-tight text-muted-foreground sm:flex">
-                        <span>{formatRelative(issue.last_occurrence_at)}</span>
-                        <span>seen</span>
-                    </div>
-                    {issue.assigned_to ? (
-                        <Avatar name={issue.assigned_to.name} />
-                    ) : (
-                        <Avatar name="?" muted />
-                    )}
-                </div>
+                <ExternalLink className="h-3.5 w-3.5" />
             </Link>
         </li>
     );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="hidden flex-col items-end text-right md:flex">
-            <span className="text-sm font-semibold text-foreground tabular-nums">{value}</span>
-            <span className="text-[10px] tracking-wider text-muted-foreground uppercase">{label}</span>
-        </div>
-    );
-}
-
 function Sparkline({ values }: { values: number[] }) {
     if (!values || values.length === 0) {
-        return <div className="h-8 w-32" />;
+        return <span className="text-muted-foreground/40 text-[10px]">—</span>;
     }
 
     const max = Math.max(1, ...values);
-    const width = 128;
-    const height = 32;
-    const step = width / values.length;
-
-    const points = values
-        .map((value, i) => {
-            const x = i * step + step / 2;
-            const y = height - (value / max) * (height - 4) - 2;
-            return `${x.toFixed(1)},${y.toFixed(1)}`;
-        })
-        .join(' ');
+    const width = 44;
+    const height = 18;
+    const barWidth = width / values.length;
 
     return (
-        <svg width={width} height={height} className="hidden text-emerald-500 md:block" viewBox={`0 0 ${width} ${height}`}>
-            <polyline fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" points={points} />
+        <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="text-muted-foreground/60">
+            {values.map((value, i) => {
+                const h = (value / max) * height;
+                return (
+                    <rect
+                        key={i}
+                        x={i * barWidth}
+                        y={height - h}
+                        width={Math.max(1, barWidth - 1)}
+                        height={Math.max(1, h)}
+                        fill="currentColor"
+                    />
+                );
+            })}
         </svg>
-    );
-}
-
-function PriorityBadge({ priority }: { priority: string }) {
-    const variant = priority === 'high' ? 'destructive' : priority === 'medium' ? 'warning' : 'muted';
-    return (
-        <Badge variant={variant} className="text-[10px] tracking-wide uppercase">
-            {priority}
-        </Badge>
-    );
-}
-
-function CountBadge({ value, active }: { value: number; active: boolean }) {
-    return (
-        <span
-            className={cn(
-                'inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums',
-                active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
-            )}
-        >
-            {value > 999 ? '999+' : value}
-        </span>
     );
 }
 
@@ -263,12 +330,12 @@ function Avatar({ name, muted = false }: { name: string; muted?: boolean }) {
     return (
         <span
             className={cn(
-                'grid h-7 w-7 place-items-center rounded-full text-[10px] font-semibold',
-                muted ? 'bg-muted text-muted-foreground' : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300',
+                'grid h-6 w-6 place-items-center rounded-full text-[10px] font-semibold',
+                muted ? 'border border-dashed border-muted-foreground/40 text-muted-foreground/60' : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300',
             )}
             title={name}
         >
-            {name.charAt(0).toUpperCase()}
+            {muted ? '' : name.charAt(0).toUpperCase()}
         </span>
     );
 }
@@ -277,28 +344,20 @@ function EmptyState() {
     return (
         <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
             <p className="text-sm font-medium">No issues match the filter</p>
-            <p className="mt-1 text-xs text-muted-foreground">Try widening the status or assignee filter.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Try widening the status filter.</p>
         </div>
     );
 }
 
-function tabCount(status: string, counts: Counts): number {
-    switch (status) {
-        case 'open':
-            return counts.open;
-        case 'resolved':
-            return counts.resolved;
-        case 'ignored':
-            return counts.ignored;
-        case 'all':
-            return counts.all;
-        default:
-            return 0;
+function formatCount(n: number): string {
+    if (n >= 1000) {
+        return (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k';
     }
+    return n.toLocaleString();
 }
 
 function formatRelative(iso: string | null): string {
-    if (!iso) return 'never';
+    if (!iso) return '—';
     const date = new Date(iso);
     const diff = Date.now() - date.getTime();
     const seconds = Math.floor(diff / 1000);

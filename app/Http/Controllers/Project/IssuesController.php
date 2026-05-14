@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Project;
 use App\Http\Controllers\Controller;
 use App\Models\ErrorGroup;
 use App\Models\ErrorOccurrence;
+use App\Models\IssueComment;
 use App\Models\Project;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,11 +18,26 @@ use Inertia\Response;
 
 class IssuesController extends Controller
 {
+    private const SORTABLE = [
+        'id' => 'display_number',
+        'count' => 'total_count',
+        'users' => 'users_count',
+        'first_seen' => 'first_occurrence_at',
+        'last_seen' => 'last_occurrence_at',
+    ];
+
     public function index(Project $project, Request $request): Response
     {
         $status = $request->string('status', 'open')->toString();
-        $assignee = $request->string('assignee')->toString() ?: null;
         $search = trim($request->string('search')->toString());
+        $sort = $request->string('sort', 'last_seen')->toString();
+        $direction = strtolower($request->string('direction', 'desc')->toString()) === 'asc' ? 'asc' : 'desc';
+
+        if (! array_key_exists($sort, self::SORTABLE)) {
+            $sort = 'last_seen';
+        }
+
+        $userId = $request->user()?->id;
 
         $query = $project->errorGroups()
             ->with('assignedTo:id,name,email')
@@ -27,32 +45,23 @@ class IssuesController extends Controller
                 $q->select(DB::raw('count(distinct user_identifier)'));
             }]);
 
-        if ($status === 'open') {
-            $query->where('status', 'unresolved');
-        } elseif ($status === 'resolved') {
-            $query->where('status', 'resolved');
-        } elseif ($status === 'ignored') {
-            $query->where('status', 'ignored');
-        }
-
-        if ($assignee === 'unassigned') {
-            $query->whereNull('assigned_to_user_id');
-        } elseif ($assignee === 'mine' && $request->user()) {
-            $query->where('assigned_to_user_id', $request->user()->id);
-        }
+        $this->applyStatusFilter($query, $status, $userId);
 
         if ($search !== '') {
             $like = '%'.$search.'%';
-            $query->where(function ($q) use ($like) {
+            $query->where(function (Builder $q) use ($like) {
                 $q->where('exception_class', 'like', $like)
                     ->orWhere('first_message', 'like', $like);
             });
         }
 
-        $groups = $query
-            ->orderByDesc('last_occurrence_at')
-            ->paginate(25)
-            ->withQueryString();
+        $column = self::SORTABLE[$sort];
+        $query->orderBy($column, $direction);
+        if ($sort !== 'last_seen') {
+            $query->orderByDesc('last_occurrence_at');
+        }
+
+        $groups = $query->paginate(25)->withQueryString();
 
         $sparklines = $this->sparklines($project, $groups->pluck('id')->all());
 
@@ -79,14 +88,15 @@ class IssuesController extends Controller
             'sparkline' => $sparklines[$group->id] ?? [],
         ]);
 
-        $counts = $this->statusCounts($project, $request->user()?->id);
+        $counts = $this->statusCounts($project, $userId);
 
         return Inertia::render('projects/issues/index', [
             'groups' => $groups,
             'filters' => [
                 'status' => $status,
-                'assignee' => $assignee,
                 'search' => $search,
+                'sort' => $sort,
+                'direction' => $direction,
             ],
             'counts' => $counts,
         ]);
@@ -102,6 +112,7 @@ class IssuesController extends Controller
 
         /** @var ErrorOccurrence|null $latest */
         $latest = $group->occurrences()
+            ->with('trace:id,method,uri')
             ->latest('occurred_at')
             ->first();
 
@@ -124,13 +135,47 @@ class IssuesController extends Controller
 
         $assignableUsers = $project->organization?->users()
             ->orderBy('name')
-            ->get(['id', 'name', 'email'])
+            ->get(['users.id', 'users.name', 'users.email'])
             ->map(fn ($user) => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
             ])
             ->all() ?? [];
+
+        $occurrenceList = $group->occurrences()
+            ->with('trace:id,method,uri')
+            ->latest('occurred_at')
+            ->limit(50)
+            ->get()
+            ->map(fn (ErrorOccurrence $occurrence) => [
+                'id' => $occurrence->id,
+                'occurred_at' => $occurrence->occurred_at?->toIso8601String(),
+                'message' => $occurrence->message,
+                'user_identifier' => $occurrence->user_identifier,
+                'user_email' => $occurrence->user_email,
+                'user_name' => $occurrence->user_name,
+                'source_type' => $occurrence->trace?->method ?: 'COMMAND',
+                'source_label' => $this->sourceLabel($occurrence),
+            ])
+            ->all();
+
+        $comments = $group->comments()
+            ->with('user:id,name,email')
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn (IssueComment $comment) => [
+                'id' => $comment->id,
+                'body' => $comment->body,
+                'type' => $comment->type,
+                'created_at' => $comment->created_at?->toIso8601String(),
+                'user' => $comment->user ? [
+                    'id' => $comment->user->id,
+                    'name' => $comment->user->name,
+                    'email' => $comment->user->email,
+                ] : null,
+            ])
+            ->all();
 
         return Inertia::render('projects/issues/show', [
             'issue' => [
@@ -169,6 +214,8 @@ class IssuesController extends Controller
                     'context' => $latest->context ?? [],
                     'occurred_at' => $latest->occurred_at?->toIso8601String(),
                 ] : null,
+                'occurrence_list' => $occurrenceList,
+                'comments' => $comments,
             ],
             'assignableUsers' => $assignableUsers,
         ]);
@@ -232,6 +279,50 @@ class IssuesController extends Controller
     }
 
     /**
+     * @param  Builder<ErrorGroup>|HasMany<ErrorGroup, Project>  $query
+     */
+    private function applyStatusFilter(Builder|HasMany $query, string $status, ?int $userId): void
+    {
+        switch ($status) {
+            case 'unassigned':
+                $query->where('status', 'unresolved')->whereNull('assigned_to_user_id');
+                break;
+            case 'mine':
+                if ($userId) {
+                    $query->where('status', 'unresolved')->where('assigned_to_user_id', $userId);
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+                break;
+            case 'resolved':
+                $query->where('status', 'resolved');
+                break;
+            case 'ignored':
+                $query->where('status', 'ignored');
+                break;
+            case 'open':
+            default:
+                $query->where('status', 'unresolved');
+                break;
+        }
+    }
+
+    private function sourceLabel(ErrorOccurrence $occurrence): ?string
+    {
+        if ($occurrence->trace?->uri) {
+            return $occurrence->trace->uri;
+        }
+
+        if ($occurrence->file) {
+            $parts = explode('/', $occurrence->file);
+
+            return end($parts) ?: $occurrence->file;
+        }
+
+        return null;
+    }
+
+    /**
      * @param  list<string>  $groupIds
      * @return array<string, list<int>>
      */
@@ -275,7 +366,7 @@ class IssuesController extends Controller
     /**
      * @return array<string, int>
      */
-    private function statusCounts(Project $project, ?string $userId): array
+    private function statusCounts(Project $project, ?int $userId): array
     {
         $base = $project->errorGroups();
 

@@ -5,6 +5,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Project\CacheController;
 use App\Http\Controllers\Project\CommandsController;
 use App\Http\Controllers\Project\ExceptionsController;
+use App\Http\Controllers\Project\IssueCommentsController;
 use App\Http\Controllers\Project\IssuesController;
 use App\Http\Controllers\Project\JobsController;
 use App\Http\Controllers\Project\LogsController;
@@ -83,6 +84,13 @@ Route::middleware('auth')->group(function () {
             Route::patch('/issues/{issue}', [IssuesController::class, 'update'])
                 ->whereNumber('issue')
                 ->name('issues.update');
+            Route::post('/issues/{issue}/comments', [IssueCommentsController::class, 'store'])
+                ->whereNumber('issue')
+                ->name('issues.comments.store');
+            Route::delete('/issues/{issue}/comments/{comment}', [IssueCommentsController::class, 'destroy'])
+                ->whereNumber('issue')
+                ->whereNumber('comment')
+                ->name('issues.comments.destroy');
             Route::get('/jobs', [JobsController::class, 'index'])->name('jobs.index');
             Route::get('/jobs/{job}', [JobsController::class, 'show'])
                 ->where('job', '[A-Za-z0-9._-]+')
