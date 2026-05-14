@@ -93,7 +93,7 @@ export function ProjectShell({ project, projects, user, children }: ProjectShell
                             title="Expand sidebar"
                             className="group relative grid h-7 w-7 shrink-0 place-items-center rounded-md bg-emerald-500 text-xs font-semibold text-white transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                         >
-                            <span className="group-hover:opacity-0">LW</span>
+                            <span className="group-hover:opacity-0">WT</span>
                             <PanelLeftOpen className="absolute h-4 w-4 opacity-0 group-hover:opacity-100" />
                         </button>
                     ) : (
@@ -101,7 +101,7 @@ export function ProjectShell({ project, projects, user, children }: ProjectShell
                             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-emerald-500 text-xs font-semibold text-white">
                                 LW
                             </span>
-                            <span className="text-sm font-semibold tracking-tight">LaravelWatch</span>
+                            <span className="text-sm font-semibold tracking-tight">Watchtower</span>
                             <Button
                                 type="button"
                                 onClick={toggleCollapsed}
